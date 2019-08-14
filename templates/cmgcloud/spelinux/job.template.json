@@ -33,11 +33,11 @@
                 "2017.10"
             ]
         },           
-        "jobName": {
+        "userName": {
             "type": "string",
             "defaultValue": "cmguser",
             "metadata": {
-                "description": "The name of the Azure Batch job, also used to prefix simulation outputs"
+                "description": "The owner name of the Azure Batch job, also used to prefix simulation outputs"
             }
         },
         "scriptFilegroup": {
@@ -70,7 +70,11 @@
                 "dependsOn": "inputFilegroup",
                 "wildcards": "*.dat"
             }
-        },     
+        },    
+        "taskName":{
+          "type": "string",
+          "defaultValue": "test"
+        }, 
         "simulatorSwitches": {
             "type": "string",
             "defaultValue": "-sr3",
@@ -85,15 +89,20 @@
                 "advancedType": "file-group"
             }
         }
-    },  
+    },
     "variables": {
-        "storageName": "cmgsimscript"
-    },    
+      "scriptSettings": {      
+        "test": {
+          "fileGroup": "fgrp-cmgsimscript",
+          "prefix": "run_simulator.py"
+        }
+      }
+    },            
     "job": {
         "type": "Microsoft.Batch/batchAccounts/jobs",
         "properties": {
-            "id": "[parameters('jobName')]",
-            "onAllTasksComplete": "TerminateJob",
+            "id": "[parameters('userName')]",
+            "onAllTasksComplete": "terminateJob",
             "poolInfo": {
                 "poolId": "[parameters('poolId')]"
             },
@@ -102,12 +111,12 @@
                 "type": "taskCollection",
                 "tasks": [
                     {
-                        "id" : "[parameters('jobName')]-task1",
-                        "displayName": "",
+                        "id" : "[parameters('userName')]-[parameters('taskName')]",
+                        "displayName": "[parameters('taskName')]",
                         "userIdentity": {
                             "autoUser": {
                                 "scope": "task",
-                                "elevationLevel": "admin"
+                                "elevationLevel": "nonAdmin"
                             }
                         },
                         "applicationPackageReferences": [
@@ -133,7 +142,7 @@
                                 "value": "1"
                             }
                           ],
-                        "commandLine": "/bin/bash -c 'env; python3 run_simulator.py [parameters('cmgAppPackage')] [parameters('cmgAppPackageVersion')] [parameters('datFile')] [parameters('additionalSwitches')]'",
+                        "commandLine": "/bin/bash -c 'python3 run_simulator.py [parameters('cmgAppPackage')] [parameters('cmgAppPackageVersion')] [parameters('datFile')] [parameters('simulatorSwitches')]'",
                         "resourceFiles": [
                             {
                                 "source": {
@@ -144,7 +153,7 @@
                             {
                                 "source": {
                                     "fileGroup": "[parameters('inputFilegroup')]",
-                                    "prefix": "[parameters('jobName')]"
+                                    "prefix": "[parameters('userName')]"
                                 }
                             }
                         ],
@@ -154,7 +163,7 @@
                                 "destination": {
                                     "autoStorage": {
                                         "fileGroup": "[parameters('outputFilegroup')]",
-                                        "path": "[parameters('jobName')]/logs/stdout.txt"
+                                        "path": "[parameters('userName')]/logs/[parameters('taskName')]-stdout.txt"
                                     }
                                 },
                                 "uploadOptions": {
@@ -166,7 +175,7 @@
                                 "destination": {
                                     "autoStorage": {
                                         "fileGroup": "[parameters('outputFilegroup')]",
-                                        "path": "[parameters('jobName')]/logs/stderr.txt"
+                                        "path": "[parameters('userName')]/logs/[parameters('taskName')]-stderr.txt"
                                     }
                                 },
                                 "uploadOptions": {
@@ -178,7 +187,7 @@
                                 "destination": {
                                     "autoStorage": {
                                         "fileGroup": "[parameters('outputFilegroup')]",
-                                        "path": "[parameters('jobName')]"
+                                        "path": "[parameters('userName')]/[parameters('taskName')]"
                                     }
                                 },
                                 "uploadOptions": {
