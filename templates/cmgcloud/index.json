@@ -2,6 +2,6 @@
     {
         "id": "spelinux",
         "name": "Run single instance jobs on linux node",
-        "description": ""
+        "description": "This job will run a single *.dat file"
     }
 ]
