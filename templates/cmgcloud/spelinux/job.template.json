@@ -1,0 +1,194 @@
+{
+    "templateMetadata": {
+        "description": "Sample application template for working with CMG Cloud."
+    },
+    "parameters": {
+        "poolId": {
+            "type": "string",
+            "metadata": {
+                "description": "The ID of the pool on which to run the job."
+            }
+        },
+        "cmgAppPackage": {
+            "type": "string",
+            "defaultValue": "GEM",
+            "metadata": {
+                "description": "The choose of CMG Simulators to run jobs"
+            },
+            "allowedValues":[
+                "GEM",
+                "IMEX",
+                "STARS"
+            ]
+        },       
+        "cmgAppPackageVersion": {
+            "type": "string",
+            "defaultValue": "2018.10",
+            "metadata": {
+                "description": "The version of the CMG Simulator"
+            },
+            "allowedValues":[
+                "2019.10",
+                "2018.10",
+                "2017.10"
+            ]
+        },           
+        "jobName": {
+            "type": "string",
+            "defaultValue": "cmguser",
+            "metadata": {
+                "description": "The name of the Azure Batch job, also used to prefix simulation outputs"
+            }
+        },
+        "scriptFilegroup": {
+            "type": "string",
+            "metadata": {
+                "description": "The file group where the scripts are stored.",
+                "advancedType": "file-group"
+            }
+        }, 
+        "simrunFile": {
+            "type": "string",
+            "metadata": {
+                "description": "The CMG simrun file to be run",
+                "advancedType": "file-in-file-group",
+                "dependsOn": "scriptFilegroup"
+            }
+        },                
+        "inputFilegroup": {
+            "type": "string",
+            "metadata": {
+                "description": "The file group where the input files are stored.",
+                "advancedType": "file-group"
+            }
+        },
+        "datFile": {
+            "type": "string",
+            "metadata": {
+                "description": "The CMG dat file to be run",
+                "advancedType": "file-in-file-group",
+                "dependsOn": "inputFilegroup",
+                "wildcards": "*.dat"
+            }
+        },     
+        "simulatorSwitches": {
+            "type": "string",
+            "defaultValue": "-sr3",
+            "metadata": {
+                "description": "Any additional arguments to pass to CMG Simulators, e.g. -sr3"
+            }
+        },
+        "outputFilegroup": {
+            "type": "string",
+            "metadata": {
+                "description": "The file group where outputs will be stored",
+                "advancedType": "file-group"
+            }
+        }
+    },  
+    "variables": {
+        "storageName": "cmgsimscript"
+    },    
+    "job": {
+        "type": "Microsoft.Batch/batchAccounts/jobs",
+        "properties": {
+            "id": "[parameters('jobName')]",
+            "onAllTasksComplete": "TerminateJob",
+            "poolInfo": {
+                "poolId": "[parameters('poolId')]"
+            },
+            "displayName": "",
+            "taskFactory": {
+                "type": "taskCollection",
+                "tasks": [
+                    {
+                        "id" : "[parameters('jobName')]-task1",
+                        "displayName": "",
+                        "userIdentity": {
+                            "autoUser": {
+                                "scope": "task",
+                                "elevationLevel": "admin"
+                            }
+                        },
+                        "applicationPackageReferences": [
+                            { 
+                            "applicationId": "[parameters('cmgAppPackage')]", "version": "[parameters('cmgAppPackageVersion')]" 
+                            }
+                        ],     
+                        "environmentSettings": [
+                            {
+                                "name": "CMG_LIC_HOST",
+                                "value": "50.0.0.6"
+                            },                                                                                   
+                            {
+                                "name": "KMP_AFFINITY",
+                                "value": "compact,2"
+                            },
+                            {
+                                "name": "OMP_SCHEDULE",
+                                "value": "static,1"
+                            },
+                            {
+                                "name": "SR3_LEGACY_LOCKING",
+                                "value": "1"
+                            }
+                          ],
+                        "commandLine": "/bin/bash -c 'env; python3 run_simulator.py [parameters('cmgAppPackage')] [parameters('cmgAppPackageVersion')] [parameters('datFile')] [parameters('additionalSwitches')]'",
+                        "resourceFiles": [
+                            {
+                                "source": {
+                                    "fileGroup": "[parameters('scriptFilegroup')]",
+                                    "prefix": "[parameters('simrunFile')]"
+                                }
+                            },                          
+                            {
+                                "source": {
+                                    "fileGroup": "[parameters('inputFilegroup')]",
+                                    "prefix": "[parameters('jobName')]"
+                                }
+                            }
+                        ],
+                        "outputFiles": [
+                            {
+                                "filePattern": "../stdout.txt",
+                                "destination": {
+                                    "autoStorage": {
+                                        "fileGroup": "[parameters('outputFilegroup')]",
+                                        "path": "[parameters('jobName')]/logs/stdout.txt"
+                                    }
+                                },
+                                "uploadOptions": {
+                                    "uploadCondition": "taskCompletion"
+                                }
+                            },
+                            {
+                                "filePattern": "../stderr.txt",
+                                "destination": {
+                                    "autoStorage": {
+                                        "fileGroup": "[parameters('outputFilegroup')]",
+                                        "path": "[parameters('jobName')]/logs/stderr.txt"
+                                    }
+                                },
+                                "uploadOptions": {
+                                    "uploadCondition": "taskCompletion"
+                                }
+                            },
+                            {
+                                "filePattern": "*",
+                                "destination": {
+                                    "autoStorage": {
+                                        "fileGroup": "[parameters('outputFilegroup')]",
+                                        "path": "[parameters('jobName')]"
+                                    }
+                                },
+                                "uploadOptions": {
+                                    "uploadCondition": "TaskSuccess"
+                                }
+                            }
+                        ]
+                    }
+                ]
+            }
+        }
+    }
+}
